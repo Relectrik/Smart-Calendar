@@ -26,8 +26,8 @@ class Event:
 
 class Calendar:
     def __init__(self):
-        self.scheduled_events = []
-        self.unscheduled_events = []
+        self.scheduled_events = [tuple()]
+        self.unscheduled_events = set()
 
     def event_type_processing(self):
         for event in self.events:
@@ -41,18 +41,34 @@ class Calendar:
                     # do smth
 
     def find_optimal_time_slot(self):
+        # [!] TODO:
+        # Must find best timeslots for every type of task in pre-existing calendar.
+        # Should perform checks using arc consistency and node consistency to satisfy constraints of pre-existing calendar.
+        # Given set constraints, deadline and priority, provide optimal calendar.
+        # After main workhorse has been implemented with satisfactory results, consider using NN to improve decisions over time.
         for event in self.unscheduled_events:
             # do smth
             return
 
-    def add_to_cal(self, event):
-        self.unscheduled_events.append(event)
+    def add_to_cal(self, date, event):
+        self.scheduled_events[date] = event
 
     def remove_from_cal(self, event):
-        self.scheduled_events.remove(event)
+        return
+
+    def constraint_satisfaction(self, event):
+        return
+
+    def priority_add(self):
+        return
+
+    def node_consistency():
+        return
+
+    def arc_consistency():
+        return
 
 
 # [!] To-do next time:
-# 1. Mypy
-# 2. list out possible occurences for all attributes in event object
-# 3. take a crack at some heuristic if possible
+# Mypy
+# Take a crack at some heuristic if possible
