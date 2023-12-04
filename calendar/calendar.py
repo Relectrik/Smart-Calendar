@@ -1,5 +1,6 @@
 from datetime import timedelta
 import copy
+from datetime import datetime
 
 
 class DateConstraint:
@@ -47,7 +48,7 @@ class DateConstraint:
         return self.arity
 
     def __str__(self) -> str:
-        return self.l_val + " " + self.op
+        return f"{self.l_val} {self.op}"
 
 
 class UnaryConstraint(DateConstraint):
@@ -56,7 +57,7 @@ class UnaryConstraint(DateConstraint):
         self.r_val = r_val
 
     def __str__(self) -> str:
-        return super().__str__() + " " + self.r_val
+        return f"{super().__str__()} {self.r_val}"
 
     def __eq__(self, other) -> bool:
         if self == other:
@@ -105,7 +106,22 @@ class BinaryConstraint(DateConstraint):
         return hash(self.l_val) * hash(self.op) * hash(self.r_val)
 
     def __str__(self) -> str:
-        return super().__str__() + " " + self.r_val
+        return f"{super().__str__()} {self.r_val}"
+
+
+class MeetingDomain:
+    def __init__(self, range_start=None, range_end=None, other=None) -> None:
+        if range_start is None:
+            self.domain_values = set(other.domain_values)
+        else:
+            self.domain_values = set()
+            current_date = range_start
+            while current_date <= range_end:
+                self.domain_values.add(current_date)
+                current_date += timedelta(days=1)
+
+    def __str__(self) -> str:
+        return f"{self.domain_values}"
 
 
 class Event:
@@ -156,6 +172,11 @@ class Calendar:
         for event in self.unscheduled_events:
             # do smth
             return
+
+    def meeting_domain_list(self, nMeetings, rangeStart, rangeEnd):
+        meeting_domain_list = []
+        for i in range(nMeetings):
+            meeting_domain_list.append(MeetingDomain(rangeStart, rangeEnd))
 
     def add_to_cal(self, date, event):
         self.scheduled_events[date] = event
