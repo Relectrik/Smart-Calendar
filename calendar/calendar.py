@@ -1,6 +1,7 @@
 from datetime import timedelta
 import copy
 from datetime import datetime
+from typing import List
 
 
 # Objects & Classes for CSP Solver
@@ -16,20 +17,58 @@ class DateConstraint:
         self.op = operator
         self.arity = arity
 
-    def is_satisfied_by(self, leftDate, rightDate):
+    def is_satisfied_by(self, left_date, right_date):
+        # match self.op:
+        #     case "==":
+        #         return (
+        #             (left_date.year == right_date.year)
+        #             and (left_date.month == right_date.month)
+        #             and (left_date.day == right_date.day)
+        #         )
+        #     case "!=":
+        #         return (
+        #             (left_date.year != right_date.year)
+        #             and (left_date.month != right_date.month)
+        #             and (left_date.day != right_date.day)
+        #         )
+        #     case ">":
+        #         return (
+        #             (left_date.year > right_date.year)
+        #             and (left_date.month > right_date.month)
+        #             and (left_date.day > right_date.day)
+        #         )
+        #     case "<":
+        #         return (
+        #             (left_date.year < right_date.year)
+        #             and (left_date.month < right_date.month)
+        #             and (left_date.day < right_date.day)
+        #         )
+        #     case ">=":
+        #         return (
+        #             (left_date.year >= right_date.year)
+        #             and (left_date.month >= right_date.month)
+        #             and (left_date.day >= right_date.day)
+        #         )
+        #     case "<=":
+        #         return (
+        #             (left_date.year <= right_date.year)
+        #             and (left_date.month <= right_date.month)
+        #             and (left_date.day <= right_date.day)
+        #         )
+        # return False
         match self.op:
             case "==":
-                return leftDate == rightDate
+                return left_date == right_date
             case "!=":
-                return leftDate != rightDate
+                return left_date != right_date
             case ">":
-                return leftDate > rightDate
+                return left_date > right_date
             case "<":
-                return leftDate < rightDate
+                return left_date < right_date
             case ">=":
-                return leftDate >= rightDate
+                return left_date >= right_date
             case "<=":
-                return leftDate <= rightDate
+                return left_date <= right_date
         return False
 
     def get_symmetrical_op(self):
@@ -60,16 +99,15 @@ class UnaryConstraint(DateConstraint):
     def __str__(self) -> str:
         return f"{super().__str__()} {self.r_val}"
 
-    def __eq__(self, other) -> bool:
-        if self == other:
+    def __eq__(self, other):
+        if self is other:
             return True
-        if type(self) != type(other):
+        if not isinstance(other, UnaryConstraint):
             return False
-        otherDC = copy.deepcopy(other)
         return (
-            self.l_val == otherDC.l_val
-            and self.op == otherDC.op
-            and self.r_val == otherDC.r_val
+            self.l_val == other.r_val
+            and self.op == other.op
+            and self.r_val == other.r_val
         )
 
     def __hash__(self) -> int:
@@ -86,21 +124,21 @@ class BinaryConstraint(DateConstraint):
     def get_reverse(self):
         return BinaryConstraint(self.r_val, self.get_symmetrical_op(), self.l_val)
 
-    def __eq__(self, other) -> bool:
-        if self == other:
+    def __eq__(self, other):
+        if self is other:
             return True
-        if type(self) != type(other):
+        if not isinstance(other, BinaryConstraint):
             return False
-        otherDC = copy.deepcopy(other)
-        reversed = self.getReverse()
+        reversed_constraint = self.get_reverse()
+        other_dc = other
         return (
-            self.l_val == other.l_val
-            and self.op == otherDC.op
-            and self.r_val == otherDC.r_val
+            self.l_val == other_dc.l_val
+            and self.op == other_dc.op
+            and self.r_val == other_dc.r_val
         ) or (
-            reversed.l_val == otherDC.l_val
-            and reversed.op == otherDC.op
-            and reversed.r_val == otherDC.r_val
+            reversed_constraint.l_val == other_dc.l_val
+            and reversed_constraint.op == other_dc.op
+            and reversed_constraint.r_val == other_dc.r_val
         )
 
     def __hash__(self) -> int:
@@ -131,21 +169,23 @@ class Arc:
         self.head = head
         self.constraint = constraint
 
-    def __eq__(self, other) -> bool:
-        if self == other:
+    def __eq__(self, other):
+        if self is other:
             return True
-        if type(self) != type(other):
+        if not isinstance(other, Arc):
             return False
-        other_arc = copy.deepcopy(other)
+        other_arc = other
         return (
-            self.tail
-            == other_arc.tail & self.head
-            == other_arc.head & self.constraint
-            == other_arc.constraint
+            self.tail == other_arc.tail
+            and self.head == other_arc.head
+            and self.constraint == other_arc.constraint
         )
 
     def __str__(self) -> str:
         return f"({self.tail} -> {self.head})"
+
+    def __hash__(self) -> int:
+        return hash(self.tail) + hash(self.head) + hash(self.constraint)
 
 
 # Calendar
@@ -189,6 +229,7 @@ class Calendar:
                     # do smth
 
     def solve(self, n_meetings, range_start, range_end, constraints):
+        range_start, range_end = self.normalize_date(range_start, range_end)
         index_domain = self.meeting_domain_list(n_meetings, range_start, range_end)
         self.node_consistency(index_domain, constraints)
         self.arc_consistency(index_domain, constraints)
@@ -196,45 +237,50 @@ class Calendar:
 
     def solve_recursively(self, n_meetings, constraints, assignments, index_domains):
         if len(assignments) == n_meetings:
-            return assignments
+            return copy.deepcopy(assignments)
         for domain in index_domains:
             for date in domain.domain_values:
                 if self.is_consistent(date, constraints, assignments):
-                    assignments.add(date)
+                    assignments.append(date)
                     results = self.solve_recursively(
                         n_meetings, constraints, assignments, index_domains
                     )
-                    if results != None:
+                    if results is not None:
                         return results
-                    assignments.pop(len(assignments) - 1)
+                    assignments.pop()
         return None
 
-    def is_consistent(date, constraints, assignments):
-        assignments.add(date)
+    def is_consistent(self, date, constraints, assignments):
+        assignments.append(date)
         for constraint in constraints:
             if constraint.arity == 1:
                 try:
-                    assignments.get(constraint.l_val)
+                    assignments[constraint.l_val]
                 except IndexError:
                     continue
-                if constraint.is_satisfied_by(constraint.l_val, constraint.r_val):
+                if constraint.is_satisfied_by(
+                    assignments[constraint.l_val], constraint.r_val
+                ):
                     continue
                 else:
-                    assignments.pop(len(assignments) - 1)
+                    assignments.pop()
                     return False
 
             else:
                 try:
-                    assignments.get(constraint.l_val)
-                    assignments.get(constraint.r_val)
+                    assignments[constraint.l_val]
+                    assignments[constraint.r_val]
                 except IndexError:
                     continue
-                if constraint.is_satisfied_by(constraint.l_val, constraint.r_val):
+                if constraint.is_satisfied_by(
+                    assignments[constraint.l_val], assignments[constraint.r_val]
+                ):
                     continue
                 else:
-                    assignments.pop(len(assignments) - 1)
+                    assignments.pop()
+                    return False
 
-        assignments.pop(len(assignments) - 1)
+        assignments.pop()
         return True
 
     def find_optimal_time_slot(self):
@@ -249,8 +295,9 @@ class Calendar:
 
     def meeting_domain_list(self, nMeetings, rangeStart, rangeEnd):
         meeting_domain_list = []
-        for i in range(nMeetings):
+        for _ in range(nMeetings):
             meeting_domain_list.append(MeetingDomain(rangeStart, rangeEnd))
+        return meeting_domain_list
 
     def add_to_cal(self, date, event):
         self.scheduled_events[date] = event
@@ -266,17 +313,17 @@ class Calendar:
 
     def node_consistency(self, var_domains, constraints):
         for constraint in constraints:
-            if constraint.arity() == 1:
+            if constraint.arity == 1:
                 index_domain = var_domains[constraint.l_val]
                 index_domain_copy = copy.deepcopy(index_domain)
                 for date in index_domain_copy.domain_values:
-                    if not constraint.is_satisfied_by(date, constraint.l_val):
+                    if not constraint.is_satisfied_by(date, constraint.r_val):
                         index_domain.domain_values.remove(date)
 
     def arc_consistency(self, var_domains, constraints):
         arc_queue = set()
         for constraint in constraints:
-            if constraint.arity() == 2:
+            if constraint.arity == 2:
                 arc_queue.add(Arc(constraint.l_val, constraint.r_val, constraint))
                 arc_queue.add(
                     Arc(constraint.r_val, constraint.l_val, constraint.get_reverse())
@@ -289,7 +336,7 @@ class Calendar:
             arc_queue.remove(polled_arc)
             if self.remove_inconsistent(polled_arc, var_domains):
                 for constraint in constraints:
-                    if constraint.arity() == 2:
+                    if constraint.arity == 2:
                         if constraint.l_val == polled_arc.tail:
                             arc_queue.add(
                                 Arc(
@@ -306,14 +353,47 @@ class Calendar:
     def remove_inconsistent(self, arc, var_domains):
         removed = False
         count = 0
-        tail_domain = var_domains.get(arc.tail)
+        tail_domain = var_domains[arc.tail]
         tail_domain_copy = copy.deepcopy(tail_domain)
         for tail_date in tail_domain_copy.domain_values:
-            for head_date in var_domains.get(arc.head).domain_values:
+            for head_date in var_domains[arc.head].domain_values:
                 if not arc.constraint.is_satisfied_by(tail_date, head_date):
                     count += 1
-            if count == len(var_domains.get(arc.head).domain_values):
+            if count == len(var_domains[arc.head].domain_values):
                 tail_domain.domain_values.remove(tail_date)
                 removed = True
             count = 0
         return removed
+
+    def normalize_date(self, range_start, range_end):
+        range_start = datetime(range_start.year, range_start.month, range_start.day)
+        range_end = datetime(range_end.year, range_end.month, range_end.day)
+        return range_start, range_end
+
+
+new_calendar = Calendar()
+constraint_a = BinaryConstraint(l_val=0, operator="==", r_val=1)
+constraint_b = UnaryConstraint(0, "==", r_val=datetime(year=2023, month=12, day=11))
+constraint_c = BinaryConstraint(l_val=1, operator="!=", r_val=2)
+constraint_d = BinaryConstraint(l_val=2, operator="!=", r_val=3)
+constraint_e = BinaryConstraint(l_val=1, operator="!=", r_val=3)
+
+
+constraint_set = set()
+constraint_set.add(constraint_a)
+constraint_set.add(constraint_b)
+constraint_set.add(constraint_c)
+constraint_set.add(constraint_d)
+constraint_set.add(constraint_e)
+
+for _ in constraint_set:
+    print(_)
+print(datetime.now())
+print(
+    new_calendar.solve(
+        4,
+        datetime.now(),
+        datetime(year=2023, month=12, day=15),
+        constraint_set,
+    )
+)
